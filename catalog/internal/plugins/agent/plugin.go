@@ -56,7 +56,6 @@ func (p *Plugin) Init(_ context.Context, cfg plugin.Config) error {
 		PropertyOptionsRepository: plugin.GetRepo[models.PropertyOptionsRepository](cfg.RepoSet),
 	}
 
-
 	base := basecatalog.NewBaseLoader(cfg.ConfigPaths)
 	p.loader = agentcatalog.NewAgentLoader(p.services, base)
 

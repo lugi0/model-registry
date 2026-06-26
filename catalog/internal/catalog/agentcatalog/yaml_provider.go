@@ -63,8 +63,9 @@ func readYAMLAgentCatalog(path string) (*yamlAgentCatalog, error) {
 }
 
 func yamlAgentToEntity(ya yamlAgent, sourceID string) models.Agent {
+	namespacedName := sourceID + ":" + ya.Name
 	attrs := &models.AgentAttributes{
-		Name:       &ya.Name,
+		Name:       &namespacedName,
 		ExternalID: ya.ExternalID,
 	}
 

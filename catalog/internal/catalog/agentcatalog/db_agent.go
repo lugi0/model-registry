@@ -138,6 +138,13 @@ func (d *DBAgentCatalog) GetAgent(ctx context.Context, agentID string) (*openapi
 	return &apiAgent, nil
 }
 
+func displayNameFromStoredName(storedName string) string {
+	if _, after, ok := strings.Cut(storedName, ":"); ok {
+		return after
+	}
+	return storedName
+}
+
 func mapDBAgentToAPI(dbAgent models.Agent) openapi.Agent {
 	res := openapi.Agent{}
 
@@ -149,7 +156,7 @@ func mapDBAgentToAPI(dbAgent models.Agent) openapi.Agent {
 	attrs := dbAgent.GetAttributes()
 	if attrs != nil {
 		if attrs.Name != nil {
-			res.Name = *attrs.Name
+			res.Name = displayNameFromStoredName(*attrs.Name)
 		}
 		if attrs.CreateTimeSinceEpoch != nil {
 			ts := strconv.FormatInt(*attrs.CreateTimeSinceEpoch, 10)

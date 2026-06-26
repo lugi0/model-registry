@@ -117,7 +117,13 @@ func (l *AgentLoader) loadFromYAML(ctx context.Context, sourceID string, source 
 		default:
 		}
 
-		validNames.Add(ya.Name)
+		namespacedName := sourceID + ":" + ya.Name
+		validNames.Add(namespacedName)
+
+		if !l.state.ShouldWriteDatabase() {
+			glog.Info("No longer leader, stopping agent database writes")
+			return nil
+		}
 
 		func() {
 			l.state.TrackWrite()
