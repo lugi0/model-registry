@@ -305,7 +305,7 @@ func TestFindModels(t *testing.T) {
 				models: tc.mockModels,
 			}
 
-			service := NewModelCatalogServiceAPIService(provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, sourceLabels, nil)
 
 			resp, err := service.FindModels(
 				context.Background(),
@@ -750,7 +750,7 @@ func TestFindSources(t *testing.T) {
 			sources := catalog.NewSourceCollection()
 			sources.Merge("", tc.catalogs)
 			sourceLabels := catalog.NewLabelCollection()
-			service := NewModelCatalogServiceAPIService(&mockModelProvider{}, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(&mockModelProvider{}, sources, nil, nil, sourceLabels, nil)
 
 			// Call FindSources
 			resp, err := service.FindSources(
@@ -1125,7 +1125,7 @@ func TestFindLabels(t *testing.T) {
 			labelCollection := catalog.NewLabelCollection()
 			labelCollection.Merge("test-source", tc.labels)
 
-			service := NewModelCatalogServiceAPIService(&mockModelProvider{}, sources, nil, labelCollection, nil)
+			service := NewModelCatalogServiceAPIService(&mockModelProvider{}, sources, nil, nil, labelCollection, nil)
 
 			// Call FindLabels
 			resp, err := service.FindLabels(
@@ -1503,7 +1503,7 @@ func TestGetModel(t *testing.T) {
 			sources := catalog.NewSourceCollection()
 			sources.Merge("", tc.sources)
 			sourceLabels := catalog.NewLabelCollection()
-			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, nil, sourceLabels, nil)
 
 			// Call GetModel
 			resp, _ := service.GetModel(
@@ -1614,7 +1614,7 @@ func TestGetAllModelArtifacts(t *testing.T) {
 			sources := catalog.NewSourceCollection()
 			sources.Merge("", tc.sources)
 			sourceLabels := catalog.NewLabelCollection()
-			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, nil, sourceLabels, nil)
 
 			// Call GetAllModelArtifacts
 			resp, _ := service.GetAllModelArtifacts(
@@ -1673,7 +1673,7 @@ func TestFindModelsFilterOptions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sources := catalog.NewSourceCollection()
 			sourceLabels := catalog.NewLabelCollection()
-			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, nil, sourceLabels, nil)
 
 			resp, err := service.FindModelsFilterOptions(context.Background())
 
@@ -1833,7 +1833,7 @@ func TestGetAllModelPerformanceArtifacts(t *testing.T) {
 			})
 			sourceLabels := catalog.NewLabelCollection()
 
-			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, nil, sourceLabels, nil)
 
 			resp, err := service.GetAllModelPerformanceArtifacts(
 				context.Background(),
@@ -1906,7 +1906,7 @@ func TestFindModelsRecommended(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, sourceLabels, nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, sourceLabels, nil)
 
 	// Test recommended=true with default parameters
 	resp, err := service.FindModels(
@@ -1955,7 +1955,7 @@ func TestFindModelsRecommendedWithCustomParams(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, sourceLabels, nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, sourceLabels, nil)
 
 	// Test with custom latency property and targetRPS
 	resp, err := service.FindModels(
@@ -2004,7 +2004,7 @@ func TestFindModelsRecommendedIgnoresOrderBy(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, sourceLabels, nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, sourceLabels, nil)
 
 	// Test that orderBy is ignored when recommended=true
 	resp, err := service.FindModels(
@@ -2050,7 +2050,7 @@ func newTestServiceWithSources(models map[string]*model.CatalogModel) ModelCatal
 		models: models,
 	}
 
-	return NewModelCatalogServiceAPIService(provider, sources, nil, sourceLabels, nil)
+	return NewModelCatalogServiceAPIService(provider, sources, nil, nil, sourceLabels, nil)
 }
 
 func TestFindModelsRecommendedWithNumericNextPageToken(t *testing.T) {
@@ -2245,7 +2245,7 @@ func TestGetAllModelPerformanceArtifactsWithConfigurableProperties(t *testing.T)
 			})
 			sourceLabels := catalog.NewLabelCollection()
 
-			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, sourceLabels, nil)
+			service := NewModelCatalogServiceAPIService(tc.provider, sources, nil, nil, sourceLabels, nil)
 
 			resp, err := service.GetAllModelPerformanceArtifacts(
 				context.Background(),
@@ -2284,7 +2284,7 @@ func TestFindModelsOrderByRecommended(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, catalog.NewLabelCollection(), nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, catalog.NewLabelCollection(), nil)
 
 	// orderBy=RECOMMENDED with recommendations=false should still use the recommendation path
 	resp, err := service.FindModels(
@@ -2332,7 +2332,7 @@ func TestFindModelsOrderByRecommendedDesc(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, catalog.NewLabelCollection(), nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, catalog.NewLabelCollection(), nil)
 
 	// orderBy=RECOMMENDED with sortOrder=DESC
 	resp, err := service.FindModels(
@@ -2381,7 +2381,7 @@ func TestFindModelsOrderByRecommendedPagination(t *testing.T) {
 		},
 	}
 
-	service := NewModelCatalogServiceAPIService(provider, sources, nil, catalog.NewLabelCollection(), nil)
+	service := NewModelCatalogServiceAPIService(provider, sources, nil, nil, catalog.NewLabelCollection(), nil)
 
 	// Pass a numeric nextPageToken (the format produced by the recommended path).
 	// Before the fix, this was rejected with 400 because parsePaginationParams tried
