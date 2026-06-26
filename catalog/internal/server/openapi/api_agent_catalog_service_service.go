@@ -39,28 +39,16 @@ func (s *AgentCatalogServiceAPIService) FindAgents(ctx context.Context, name str
 	if len(source) > 0 {
 		sourceIDs = source
 	} else if len(sourceLabel) > 0 && s.sources != nil {
-		allSources := s.sources.AllSources()
-		for id, src := range allSources {
-			for _, label := range src.Labels {
-				for _, sl := range sourceLabel {
-					if sl == label || (sl == "null" && len(src.Labels) == 0) {
-						sourceIDs = append(sourceIDs, id)
-					}
-				}
-			}
-			if len(src.Labels) == 0 {
-				for _, sl := range sourceLabel {
-					if sl == "null" {
-						sourceIDs = append(sourceIDs, id)
-					}
-				}
-			}
-		}
-		if len(sourceIDs) == 0 {
+		matched := s.sources.ByLabel(sourceLabel)
+		if len(matched) == 0 {
 			return Response(http.StatusOK, model.AgentList{
 				Items:    []model.Agent{},
 				PageSize: pageSizeInt,
 			}), nil
+		}
+		sourceIDs = make([]string, len(matched))
+		for i, src := range matched {
+			sourceIDs[i] = src.ID
 		}
 	}
 

@@ -49,12 +49,39 @@ func NewAgentRepository(db *gorm.DB, typeID int32) models.AgentRepository {
 }
 
 // Save creates or updates an agent, ensuring TypeID is set.
+// If the entity has no ID but has a name, it looks up an existing agent by name
+// to enable upsert (update on reload instead of duplicate-key error).
 func (r *AgentRepositoryImpl) Save(entity models.Agent) (models.Agent, error) {
 	config := r.GetConfig()
 	if entity.GetTypeID() == nil && config.TypeID > 0 {
 		entity.SetTypeID(config.TypeID)
 	}
+
+	attr := entity.GetAttributes()
+	if entity.GetID() == nil && attr != nil && attr.Name != nil {
+		existing, err := r.lookupAgentByName(*attr.Name)
+		if err != nil {
+			if !errors.Is(err, ErrAgentNotFound) {
+				return nil, fmt.Errorf("error finding existing agent named %s: %w", *attr.Name, err)
+			}
+		} else {
+			entity.SetID(existing.ID)
+		}
+	}
+
 	return r.GenericRepository.Save(entity, nil)
+}
+
+func (r *AgentRepositoryImpl) lookupAgentByName(name string) (*schema.Context, error) {
+	config := r.GetConfig()
+	var entity schema.Context
+	if err := config.DB.Where("name = ? AND type_id = ?", name, config.TypeID).First(&entity).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: name=%s", ErrAgentNotFound, name)
+		}
+		return nil, fmt.Errorf("error querying agent by name: %w", err)
+	}
+	return &entity, nil
 }
 
 func mapAgentToSchema(agent models.Agent) schema.Context {

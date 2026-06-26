@@ -56,6 +56,7 @@ func (p *Plugin) Init(_ context.Context, cfg plugin.Config) error {
 		PropertyOptionsRepository: plugin.GetRepo[models.PropertyOptionsRepository](cfg.RepoSet),
 	}
 
+
 	base := basecatalog.NewBaseLoader(cfg.ConfigPaths)
 	p.loader = agentcatalog.NewAgentLoader(p.services, base)
 
@@ -70,9 +71,6 @@ func (p *Plugin) Init(_ context.Context, cfg plugin.Config) error {
 				ids.Add(id)
 			}
 			return ids
-		},
-		OnLeaderReady: func(_ context.Context) error {
-			return p.services.PropertyOptionsRepository.Refresh(models.ContextPropertyOptionType)
 		},
 	})
 

@@ -9,7 +9,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/golang/glog"
+	agentmodels "github.com/kubeflow/hub/catalog/internal/catalog/agentcatalog/models"
 	"github.com/kubeflow/hub/catalog/internal/catalog/basecatalog"
+	"github.com/kubeflow/hub/catalog/internal/db/models"
 )
 
 // AgentLoader handles loading agent data from YAML configuration files.
@@ -60,6 +62,10 @@ func (l *AgentLoader) PerformLeaderOperations(ctx context.Context, allKnownSourc
 	ctx, cancel := context.WithCancel(ctx)
 	l.setCloser(cancel)
 
+	if err := l.removeAgentsFromMissingSources(allKnownSourceIDs); err != nil {
+		glog.Errorf("error removing agents from missing sources: %v", err)
+	}
+
 	allSources := l.Sources.AllSources()
 
 	for id, source := range allSources {
@@ -83,6 +89,10 @@ func (l *AgentLoader) PerformLeaderOperations(ctx context.Context, allKnownSourc
 		basecatalog.SaveSourceStatus(l.services.CatalogSourceRepository, id, basecatalog.SourceStatusAvailable, "")
 	}
 
+	if err := l.services.PropertyOptionsRepository.Refresh(models.ContextPropertyOptionType); err != nil {
+		glog.Errorf("error refreshing property options after agent load: %v", err)
+	}
+
 	glog.Infof("%s loader leader operations complete", "agent")
 	return nil
 }
@@ -98,6 +108,8 @@ func (l *AgentLoader) loadFromYAML(ctx context.Context, sourceID string, source 
 		return err
 	}
 
+	validNames := mapset.NewSet[string]()
+
 	for _, ya := range catalog.Agents {
 		select {
 		case <-ctx.Done():
@@ -105,10 +117,22 @@ func (l *AgentLoader) loadFromYAML(ctx context.Context, sourceID string, source 
 		default:
 		}
 
-		entity := yamlAgentToEntity(ya, sourceID)
-		if _, err := l.services.AgentRepository.Save(entity); err != nil {
-			glog.Errorf("error saving agent %s from source %s: %v", ya.Name, sourceID, err)
-			continue
+		validNames.Add(ya.Name)
+
+		func() {
+			l.state.TrackWrite()
+			defer l.state.WriteComplete()
+
+			entity := yamlAgentToEntity(ya, sourceID)
+			if _, err := l.services.AgentRepository.Save(entity); err != nil {
+				glog.Errorf("error saving agent %s from source %s: %v", ya.Name, sourceID, err)
+			}
+		}()
+	}
+
+	if ctx.Err() == nil {
+		if _, err := l.removeOrphanedAgentsFromSource(sourceID, validNames); err != nil {
+			glog.Errorf("error removing orphaned agents from source %s: %v", sourceID, err)
 		}
 	}
 
@@ -157,4 +181,78 @@ func (l *AgentLoader) updateSources(path string, config *basecatalog.SourceConfi
 	}
 
 	return l.Sources.Merge(path, sources)
+}
+
+func (l *AgentLoader) removeAgentsFromMissingSources(allKnownSourceIDs mapset.Set[string]) error {
+	enabledSourceIDs := mapset.NewSet[string]()
+	agentSourceIDs := mapset.NewSet[string]()
+	for id, source := range l.Sources.AllSources() {
+		agentSourceIDs.Add(id)
+		if source.IsEnabled() {
+			enabledSourceIDs.Add(id)
+		}
+	}
+
+	existingSourceIDs, err := l.services.AgentRepository.GetDistinctSourceIDs()
+	if err != nil {
+		return fmt.Errorf("unable to retrieve existing agent source IDs: %w", err)
+	}
+
+	for oldSource := range mapset.NewSet(existingSourceIDs...).Difference(enabledSourceIDs).Iter() {
+		glog.Infof("Removing agents from source %s", oldSource)
+
+		l.state.TrackWrite()
+		err = l.services.AgentRepository.DeleteBySource(oldSource)
+		l.state.WriteComplete()
+		if err != nil {
+			return fmt.Errorf("unable to remove agents from source %q: %w", oldSource, err)
+		}
+
+		if !agentSourceIDs.Contains(oldSource) {
+			glog.Infof("Removing status for agent source %s (no longer in config)", oldSource)
+			if delErr := l.services.CatalogSourceRepository.Delete(oldSource); delErr != nil {
+				glog.Errorf("failed to delete status for agent source %s: %v", oldSource, delErr)
+			}
+		}
+	}
+
+	protectedSourceIDs := agentSourceIDs.Union(allKnownSourceIDs)
+	if err := basecatalog.CleanupOrphanedCatalogSources(l.services.CatalogSourceRepository, protectedSourceIDs); err != nil {
+		glog.Errorf("failed to cleanup orphaned agent catalog sources: %v", err)
+	}
+
+	return nil
+}
+
+func (l *AgentLoader) removeOrphanedAgentsFromSource(sourceID string, validNames mapset.Set[string]) (int, error) {
+	list, err := l.services.AgentRepository.List(&agentmodels.AgentListOptions{
+		SourceIDs: &[]string{sourceID},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("unable to list agents from source %q: %w", sourceID, err)
+	}
+
+	count := 0
+	for _, agent := range list.Items {
+		attr := agent.GetAttributes()
+		if attr == nil || attr.Name == nil || agent.GetID() == nil {
+			continue
+		}
+
+		if validNames.Contains(*attr.Name) {
+			continue
+		}
+
+		glog.Infof("Removing orphaned agent %s from source %s", *attr.Name, sourceID)
+
+		l.state.TrackWrite()
+		err = l.services.AgentRepository.DeleteByID(*agent.GetID())
+		l.state.WriteComplete()
+		if err != nil {
+			return count, fmt.Errorf("unable to remove agent %d (%s from source %s): %w", *agent.GetID(), *attr.Name, sourceID, err)
+		}
+		count++
+	}
+
+	return count, nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/golang/glog"
 	"github.com/kubeflow/hub/catalog/internal/catalog/agentcatalog/models"
@@ -68,16 +69,12 @@ func yamlAgentToEntity(ya yamlAgent, sourceID string) models.Agent {
 	}
 
 	if ya.CreateTimeSinceEpoch != nil {
-		if ts, err := fmt.Sscanf(*ya.CreateTimeSinceEpoch, "%d", new(int64)); err == nil && ts > 0 {
-			var v int64
-			fmt.Sscanf(*ya.CreateTimeSinceEpoch, "%d", &v)
+		if v, err := strconv.ParseInt(*ya.CreateTimeSinceEpoch, 10, 64); err == nil {
 			attrs.CreateTimeSinceEpoch = &v
 		}
 	}
 	if ya.LastUpdateTimeSinceEpoch != nil {
-		if ts, err := fmt.Sscanf(*ya.LastUpdateTimeSinceEpoch, "%d", new(int64)); err == nil && ts > 0 {
-			var v int64
-			fmt.Sscanf(*ya.LastUpdateTimeSinceEpoch, "%d", &v)
+		if v, err := strconv.ParseInt(*ya.LastUpdateTimeSinceEpoch, 10, 64); err == nil {
 			attrs.LastUpdateTimeSinceEpoch = &v
 		}
 	}
