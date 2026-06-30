@@ -3,12 +3,14 @@ package agentcatalog
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kubeflow/hub/catalog/internal/catalog/agentcatalog/models"
+	agentservice "github.com/kubeflow/hub/catalog/internal/catalog/agentcatalog/service"
 	"github.com/kubeflow/hub/catalog/internal/catalog/basecatalog"
 	sharedmodels "github.com/kubeflow/hub/catalog/internal/db/models"
 	openapi "github.com/kubeflow/hub/catalog/pkg/openapi"
@@ -131,7 +133,10 @@ func (d *DBAgentCatalog) GetAgent(ctx context.Context, agentID string) (*openapi
 
 	dbAgent, err := d.agentRepo.GetByID(id)
 	if err != nil {
-		return nil, fmt.Errorf("agent not found with ID %s: %w", agentID, api.ErrNotFound)
+		if errors.Is(err, agentservice.ErrAgentNotFound) {
+			return nil, fmt.Errorf("agent not found with ID %s: %w", agentID, api.ErrNotFound)
+		}
+		return nil, err
 	}
 
 	apiAgent := mapDBAgentToAPI(dbAgent)

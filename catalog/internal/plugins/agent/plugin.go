@@ -27,7 +27,6 @@ func (p *Plugin) Name() string                   { return "agent" }
 func (p *Plugin) Version() string                { return "v1alpha1" }
 func (p *Plugin) Description() string            { return "Agent catalog" }
 func (p *Plugin) BasePath() string               { return "/api/agent_catalog/v1alpha1" }
-func (p *Plugin) Healthy() bool                  { return true }
 func (p *Plugin) Migrations() []plugin.Migration { return nil }
 
 func (p *Plugin) DatastoreEntries() []plugin.DatastoreEntry {
@@ -39,12 +38,16 @@ func (p *Plugin) DatastoreEntries() []plugin.DatastoreEntry {
 				AddString("source_id").
 				AddString("displayName").
 				AddString("description").
+				AddString("readme").
 				AddString("framework").
 				AddString("agentType").
 				AddStruct("tags").
 				AddStruct("models").
+				AddString("logo").
 				AddString("repositoryUrl").
-				AddString("publishedDate"),
+				AddString("publishedDate").
+				AddStruct("env").
+				AddStruct("artifacts"),
 		},
 	}
 }
