@@ -66,7 +66,9 @@ Convert the git remote URL to an HTTPS base URL:
 ```bash
 test -d <original-cwd>/.agent-catalog
 ```
-If `.agent-catalog/` already exists, ask the user whether to overwrite or choose a different output path using `AskUserQuestion`.
+If `.agent-catalog/` already exists, ask the user whether to overwrite or choose a different output
+path using `AskUserQuestion`. Store the chosen path as `<output-dir>` (default: `<original-cwd>/.agent-catalog`).
+All subsequent steps use `<output-dir>` when writing output files.
 
 ---
 
@@ -250,7 +252,7 @@ an `agent.yaml` matching the format expected by the agents catalog.
 
 **Important:** The generated `agent.yaml` is NOT written to the agent's source directory —
 it is assembled in memory and included only in the catalog output (as the `templates` entry
-in `.agent-catalog/catalog.yaml`). The agent's source directory remains unchanged.
+in `<output-dir>/catalog.yaml`). The agent's source directory remains unchanged.
 
 **For each heuristic/markdown-discovered agent:**
 
@@ -378,7 +380,7 @@ Store the confirmed agents list, source name, and source labels for output gener
 
 Create the output directory:
 ```bash
-mkdir -p <original-cwd>/.agent-catalog
+mkdir -p <output-dir>
 ```
 
 **Build the catalog YAML content.** The output must match this exact schema (compatible with
@@ -425,14 +427,14 @@ agents:
 | `labels` | From agent.yaml `labels` field. Default `[]`. **Always include this field.** |
 | `logo` | From agent.yaml `logo` field. Default `""`. **Always include this field.** |
 | `env` | Transform from `{required: [...], optional: [...]}` to flat list: each required var gets `{name: X, required: true}`, each optional var gets `{name: X, required: false}`. For markdown-inferred agents, use env vars extracted from the README. Default `[]`. **Always include this field.** |
-| `templates` | Use `./bin/yq` to convert agent.yaml to a compact JSON string. The result becomes a single template entry: `{name: "agent.yaml", content: "<json>"}`. **For convention-discovered agents** (agent.yaml already on disk): run `./bin/yq <agent-dir>/agent.yaml -o json -I 0` and capture stdout. **For heuristic/markdown-discovered agents** (no agent.yaml on disk): write the generated agent.yaml content (confirmed by the user in Step 3c) to a temporary file (`TMPFILE=$(mktemp /tmp/agent-yaml-XXXXXX.yaml)`), run `./bin/yq "$TMPFILE" -o json -I 0`, capture stdout, then clean up (`rm "$TMPFILE"`). **Always include this field.** |
+| `templates` | The `templates` content must always reflect the **final confirmed metadata** — including any edits the user made in Step 4. Convert the final metadata to a compact JSON string using `./bin/yq`. The result becomes a single template entry: `{name: "agent.yaml", content: "<json>"}`. **For all agents**, assemble a YAML representation of the final confirmed fields, write it to a temporary file (`TMPFILE=$(mktemp /tmp/agent-yaml-XXXXXX.yaml)`), run `./bin/yq "$TMPFILE" -o json -I 0`, capture stdout, then clean up (`rm "$TMPFILE"`). **For convention-discovered agents** where the user edited fields in Step 4: the on-disk `agent.yaml` is now out of sync — ask the user whether they want to update the original `agent.yaml` file in the source repository to match. **Always include this field.** |
 | `customProperties` | For each top-level field in agent.yaml NOT in the known set (`name`, `displayName`, `framework`, `description`, `labels`, `logo`, `env`), create an entry: `{metadataType: "MetadataStringValue", string_value: "<value-as-string>"}`. Omit the field entirely if there are no extra fields. |
 
 **IMPORTANT:** The 7 required fields (`name`, `displayName`, `description`, `framework`,
 `labels`, `logo`, `env`) must be present on EVERY agent entry in the catalog, regardless
 of discovery source. Use empty defaults (`[]`, `""`) where no value was found.
 
-**Write the catalog file** to `<original-cwd>/.agent-catalog/catalog.yaml`.
+**Write the catalog file** to `<output-dir>/catalog.yaml`.
 
 Ensure the file ends with a newline character.
 
@@ -445,7 +447,7 @@ Ensure the file ends with a newline character.
 
 Report to the user:
 
-> "Catalog written to `.agent-catalog/catalog.yaml` with N agents."
+> "Catalog written to `<output-dir>/catalog.yaml` with N agents."
 
 ---
 
@@ -458,7 +460,7 @@ Derive the source ID from the confirmed source name:
 - Replace spaces with underscores
 - Remove any characters that are not alphanumeric or underscores
 
-Write `<original-cwd>/.agent-catalog/sources-snippet.yaml` with the following content:
+Write `<output-dir>/sources-snippet.yaml` with the following content:
 
 ```yaml
 - name: "<confirmed-source-name>"
@@ -478,7 +480,7 @@ If the user chose no labels, use: `labels: []`
 
 ### 6b: Deploy Script
 
-Write `<original-cwd>/.agent-catalog/deploy.sh` with the following content:
+Write `<output-dir>/deploy.sh` with the following content:
 
 ```bash
 #!/bin/bash
@@ -491,7 +493,7 @@ Write `<original-cwd>/.agent-catalog/deploy.sh` with the following content:
 #
 # Usage:
 #   cd <project-root>
-#   NAMESPACE=my-namespace ./.agent-catalog/deploy.sh
+#   NAMESPACE=my-namespace <output-dir>/deploy.sh
 
 set -euo pipefail
 
@@ -501,7 +503,7 @@ CONFIGMAP_NAME="<derived-source-id>-catalog"
 echo "Creating ConfigMap '$CONFIGMAP_NAME' in namespace '$NAMESPACE'..."
 
 kubectl create configmap "$CONFIGMAP_NAME" \
-    --from-file=catalog.yaml=.agent-catalog/catalog.yaml \
+    --from-file=catalog.yaml=<output-dir>/catalog.yaml \
     -n "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
 echo ""
@@ -514,7 +516,7 @@ echo "     kubectl edit configmap <sources-configmap-name> -n $NAMESPACE"
 echo ""
 echo "  Add the following under the 'agent_catalogs' section:"
 echo ""
-cat .agent-catalog/sources-snippet.yaml
+cat <output-dir>/sources-snippet.yaml
 echo ""
 echo "  3. Update the yamlCatalogPath to match the mount path in your deployment."
 echo "  4. The catalog service will hot-reload the new source automatically."
@@ -522,7 +524,7 @@ echo "  4. The catalog service will hot-reload the new source automatically."
 
 Make the deploy script executable:
 ```bash
-chmod +x <original-cwd>/.agent-catalog/deploy.sh
+chmod +x <output-dir>/deploy.sh
 ```
 
 Replace `<derived-source-id>` in the script with the actual derived source ID value
@@ -542,13 +544,13 @@ Print to the user:
 ```
 Agent catalog source generated successfully!
 
-Output directory: .agent-catalog/
+Output directory: <output-dir>/
   catalog.yaml          — Agent catalog data (N agents)
   sources-snippet.yaml  — Sources config snippet (paste into existing sources ConfigMap)
   deploy.sh             — Deployment script for Kubernetes
 
 To deploy:
-  1. Run: ./.agent-catalog/deploy.sh
+  1. Run: <output-dir>/deploy.sh
   2. Edit the existing sources ConfigMap to add the snippet from sources-snippet.yaml
   3. The catalog service will hot-reload automatically — no restart needed.
 
